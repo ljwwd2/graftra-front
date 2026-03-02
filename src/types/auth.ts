@@ -22,6 +22,8 @@ export interface ApiResponse<T = any> {
 export interface LoginRequest {
   email: string
   password: string
+  captchaCode: string
+  captchaId: string
   remember?: boolean
 }
 
@@ -33,10 +35,41 @@ export interface WeChatLoginRequest {
 
 /** 注册请求参数 */
 export interface RegisterRequest {
-  name?: string
   email: string
   password: string
+  name?: string
+  captchaCode: string
+  captchaId: string
   agreeToTerms: boolean
+}
+
+/** 修改密码请求参数 */
+export interface ChangePasswordRequest {
+  oldPassword: string
+  newPassword: string
+}
+
+/** 更新用户信息请求参数 */
+export interface UpdateUserRequest {
+  name?: string
+  avatar?: string
+}
+
+/** 文件上传响应 */
+export interface UploadResponse {
+  url: string
+  filename: string
+}
+
+/** 验证码响应数据 */
+export interface CaptchaResponseData {
+  captchaId: string
+  image: string      // Base64编码的PNG图片
+}
+
+/** 验证码响应 */
+export interface CaptchaResponse extends ApiResponse<CaptchaResponseData> {
+  data?: CaptchaResponseData
 }
 
 /** 刷新令牌请求参数 */
@@ -94,6 +127,8 @@ export interface UserSession {
 
 /** 认证相关 API 端点 */
 export const AUTH_ENDPOINTS = {
+  // 生成验证码
+  CAPTCHA: '/api/auth/captcha',
   // 邮箱登录
   LOGIN: '/api/auth/login',
   // 邮箱注册
@@ -106,6 +141,10 @@ export const AUTH_ENDPOINTS = {
   REFRESH: '/api/auth/refresh',
   // 获取当前用户信息
   ME: '/api/auth/me',
+  // 修改密码
+  CHANGE_PASSWORD: '/api/auth/password',
+  // 上传文件
+  UPLOAD: '/api/oss/upload',
 } as const
 
 // ==================== 错误类型 ====================
@@ -122,11 +161,21 @@ export interface ApiError {
 
 /** 常见错误码 */
 export const ERROR_CODES = {
-  EMAIL_EXISTS: 'EMAIL_EXISTS',              // 邮箱已被注册
-  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS', // 邮箱或密码错误
-  UNAUTHORIZED: 'UNAUTHORIZED',               // 令牌无效或过期
-  VALIDATION_ERROR: 'VALIDATION_ERROR',       // 参数验证失败
-  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED', // 请求过于频繁
+  EMAIL_EXISTS: 'EMAIL_EXISTS',                      // 邮箱已被注册
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',        // 邮箱或密码错误
+  INVALID_CAPTCHA: 'INVALID_CAPTCHA',                // 验证码错误或已过期
+  REQUIRE_CAPTCHA: 'REQUIRE_CAPTCHA',                // 需要输入验证码（失败3次后）
+  ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',                  // 登录失败次数过多，账户已临时锁定
+  TERMS_NOT_AGREED: 'TERMS_NOT_AGREED',              // 必须同意服务条款
+  UNAUTHORIZED: 'UNAUTHORIZED',                      // 令牌无效或过期
+  INVALID_TOKEN: 'INVALID_TOKEN',                    // 无效的访问令牌
+  USER_NOT_FOUND: 'USER_NOT_FOUND',                  // 用户不存在
+  VALIDATION_ERROR: 'VALIDATION_ERROR',              // 参数验证失败
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',        // 请求过于频繁
+  INVALID_REFRESH_TOKEN: 'INVALID_REFRESH_TOKEN',    // 无效的刷新令牌
+  REFRESH_TOKEN_EXPIRED: 'REFRESH_TOKEN_EXPIRED',    // 刷新令牌已失效
+  INVALID_OLD_PASSWORD: 'INVALID_OLD_PASSWORD',      // 旧密码错误
+  SAME_PASSWORD: 'SAME_PASSWORD',                    // 新密码不能与旧密码相同
 } as const
 
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]

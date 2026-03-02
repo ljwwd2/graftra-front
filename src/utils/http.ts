@@ -75,8 +75,13 @@ http.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    // 处理 401 未授权错误
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 登录/注册接口的 401 错误不触发 token 刷新，直接返回错误
+    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
+                           originalRequest.url?.includes('/auth/register') ||
+                           originalRequest.url?.includes('/auth/wechat')
+
+    // 处理 401 未授权错误（排除登录/注册接口）
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       // 检查是否是刷新 Token 的请求，如果是则直接失败
       if (originalRequest.url?.endsWith('/auth/refresh')) {
         // 刷新 Token 失败，清除本地会话

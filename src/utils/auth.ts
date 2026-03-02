@@ -9,9 +9,13 @@ import type {
   RegisterRequest,
   WeChatLoginRequest,
   AuthResponse,
+  CaptchaResponse,
   UserSession,
   UserInfo,
-  AUTH_ENDPOINTS
+  ChangePasswordRequest,
+  UpdateUserRequest,
+  UploadResponse,
+  ApiResponse
 } from '@/types/auth'
 
 const STORAGE_KEY = 'graftra_user_session'
@@ -20,6 +24,23 @@ const STORAGE_KEY = 'graftra_user_session'
  * 认证管理类
  */
 export class AuthManager {
+  /**
+   * 获取图形验证码
+   *
+   * API 端点: POST /api/auth/captcha
+   */
+  static async getCaptcha(): Promise<CaptchaResponse> {
+    try {
+      const response = await http.post<CaptchaResponse>('/api/auth/captcha', {})
+      return response
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '获取验证码失败，请稍后重试'
+      }
+    }
+  }
+
   /**
    * 邮箱密码登录
    *
@@ -190,6 +211,82 @@ export class AuthManager {
     }
   }
 
+  /**
+   * 修改密码
+   *
+   * API 端点: PUT /api/auth/password
+   */
+  static async changePassword(data: ChangePasswordRequest): Promise<ApiResponse> {
+    try {
+      const response = await http.put<ApiResponse>('/api/auth/password', data)
+      return response
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '修改密码失败，请稍后重试'
+      }
+    }
+  }
+
+  /**
+   * 更新用户信息
+   *
+   * API 端点: PATCH /api/auth/me
+   */
+  static async updateUser(data: UpdateUserRequest): Promise<ApiResponse<UserInfo>> {
+    try {
+      const response = await http.patch<ApiResponse<UserInfo>>('/api/auth/me', data)
+
+      // 更新成功后，同步本地存储的用户信息
+      if (response.success && response.data) {
+        const session = this.getSession()
+        if (session) {
+          const updatedSession: UserSession = {
+            ...session,
+            user: response.data
+          }
+          this.saveSession(updatedSession)
+        }
+      }
+
+      return response
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '更新用户信息失败，请稍后重试'
+      }
+    }
+  }
+
+  /**
+   * 上传文件（头像）
+   *
+   * API 端点: POST /api/oss/upload
+   */
+  static async uploadFile(file: File): Promise<ApiResponse<UploadResponse>> {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await http.post<ApiResponse<UploadResponse>>(
+        '/api/oss/upload',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      )
+
+      return response
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '文件上传失败，请稍后重试'
+      }
+    }
+  }
+
   // ==================== 本地存储辅助方法 ====================
 
   /** 获取当前会话 */
@@ -238,6 +335,7 @@ export class AuthManager {
 
 // 导出便捷函数
 export const auth = {
+  getCaptcha: () => AuthManager.getCaptcha(),
   login: (credentials: LoginRequest) => AuthManager.login(credentials),
   register: (data: RegisterRequest) => AuthManager.register(data),
   wechatLogin: (params: WeChatLoginRequest) => AuthManager.wechatLogin(params),
@@ -246,4 +344,7 @@ export const auth = {
   getSession: () => AuthManager.getSession(),
   isAuthenticated: () => AuthManager.isAuthenticated(),
   getCurrentUser: () => AuthManager.getCurrentUser(),
+  changePassword: (data: ChangePasswordRequest) => AuthManager.changePassword(data),
+  updateUser: (data: UpdateUserRequest) => AuthManager.updateUser(data),
+  uploadFile: (file: File) => AuthManager.uploadFile(file),
 }

@@ -6,17 +6,6 @@
         <Hexagon :size="28" />
         Graftra
       </RouterLink>
-      <div class="navbar-actions">
-        <span class="nav-text">
-          {{ mode === 'signup' ? '已有账号？' : '还没有账号？' }}
-        </span>
-        <RouterLink
-          :to="mode === 'signup' ? '/login' : '/login?mode=signup'"
-          class="btn btn-ghost"
-        >
-          {{ mode === 'signup' ? '登录' : '注册' }}
-        </RouterLink>
-      </div>
     </nav>
 
     <!-- Main Content -->
@@ -169,16 +158,111 @@
                 <span v-if="errors.password" class="error-text">{{ errors.password }}</span>
               </div>
 
+              <!-- Confirm Password (only for signup) -->
+              <div v-show="mode === 'signup'" class="form-group">
+                <label for="confirmPassword">确认密码</label>
+                <div class="password-input">
+                  <input
+                    id="confirmPassword"
+                    v-model="form.confirmPassword"
+                    :type="showConfirmPassword ? 'text' : 'password'"
+                    class="form-input"
+                    placeholder="再次输入密码"
+                    :required="mode === 'signup'"
+                    :class="{ 'has-error': errors.confirmPassword }"
+                    @blur="validateField('confirmPassword')"
+                  >
+                  <button
+                    type="button"
+                    class="toggle-password"
+                    @click="showConfirmPassword = !showConfirmPassword"
+                    :aria-label="showConfirmPassword ? '隐藏密码' : '显示密码'"
+                  >
+                    <Eye :size="20" v-if="!showConfirmPassword" />
+                    <EyeOff :size="20" v-else />
+                  </button>
+                </div>
+                <span v-if="errors.confirmPassword" class="error-text">{{ errors.confirmPassword }}</span>
+              </div>
+
+              <!-- CAPTCHA (for both login and signup) -->
+              <div class="form-group">
+                <label for="captcha">验证码</label>
+                <div class="captcha-input">
+                  <input
+                    id="captcha"
+                    v-model="form.captcha"
+                    type="text"
+                    class="form-input captcha-field"
+                    placeholder="输入验证码"
+                    required
+                    :class="{ 'has-error': errors.captcha }"
+                    @blur="validateField('captcha')"
+                    maxlength="4"
+                  >
+                  <!-- 验证码图片 -->
+                  <div
+                    class="captcha-image-wrapper"
+                    v-show="captchaImage"
+                    @click="refreshCaptcha"
+                    title="点击刷新验证码"
+                  >
+                    <img
+                      :src="captchaImage"
+                      alt="验证码"
+                      class="captcha-img"
+                    >
+                  </div>
+                  <!-- 加载状态 -->
+                  <div
+                    class="captcha-loading"
+                    v-show="!captchaImage"
+                  >
+                    <Loader2 :size="20" class="spinner" />
+                  </div>
+                  <button
+                    type="button"
+                    class="captcha-refresh-btn"
+                    @click="refreshCaptcha"
+                    title="刷新验证码"
+                  >
+                    <RefreshCw :size="16" />
+                  </button>
+                </div>
+                <span v-if="errors.captcha" class="error-text">{{ errors.captcha }}</span>
+              </div>
+
               <div v-if="mode === 'login'" class="form-options">
                 <label class="remember-me">
                   <input type="checkbox" v-model="form.remember" checked>
                   <span>记住我</span>
                 </label>
-                <a href="#" class="forgot-link">忘记密码？</a>
+                <a href="#" class="forgot-link" @click.prevent="handleForgotPassword">忘记密码？</a>
+              </div>
+
+              <!-- Mode Toggle Link (above submit button) -->
+              <div v-if="mode === 'login'" class="mode-toggle">
+                <span class="mode-text">还没有账号？</span>
+                <RouterLink
+                  to="/login?mode=signup"
+                  class="mode-link"
+                >
+                  立即注册
+                </RouterLink>
+              </div>
+
+              <div v-else class="mode-toggle">
+                <span class="mode-text">已有账号？</span>
+                <RouterLink
+                  to="/login"
+                  class="mode-link"
+                >
+                  立即登录
+                </RouterLink>
               </div>
 
               <!-- Terms Checkbox (before submit button for signup) -->
-              <div v-if="mode === 'signup'" class="terms-checkbox">
+              <div v-show="mode === 'signup'" class="terms-checkbox">
                 <label class="terms-label">
                   <input type="checkbox" v-model="form.agreeToTerms" :class="{ 'has-error': errors.agreeToTerms }">
                   <span>我已阅读并同意
@@ -209,40 +293,52 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import {
-  Hexagon, Sparkles, Zap, Palette, Download, Shield, Eye, EyeOff, Loader2, Mail, QrCode
+  Hexagon, Sparkles, Zap, Palette, Download, Shield, Eye, EyeOff, Loader2, Mail, QrCode, RefreshCw
 } from 'lucide-vue-next'
 import { auth } from '@/utils/auth'
 import type { LoginRequest, RegisterRequest } from '@/types/auth'
+import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
 const route = useRoute()
+const toast = useToast()
 
 const mode = computed<'login' | 'signup'>(() => {
   const modeParam = route.query.mode as 'login' | 'signup' | undefined
   return modeParam === 'signup' ? 'signup' : 'login'
 })
 
-const loginMethod = ref<'wechat' | 'email'>('wechat')
+// 登录模式默认邮箱登录，注册模式也默认邮箱登录
+const loginMethod = ref<'wechat' | 'email'>('email')
 const isLoading = ref(false)
 const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+// CAPTCHA - 使用后端API
+const captchaId = ref('')              // 后端返回的验证码ID
+const captchaImage = ref('')           // 后端返回的Base64图片
 
 const form = ref({
   email: '',
   password: '',
+  confirmPassword: '',
   remember: true,
-  agreeToTerms: false
+  agreeToTerms: false,
+  captcha: '',                         // 用户输入的验证码
 })
 
 const errors = ref<{
   email?: string
   password?: string
+  confirmPassword?: string
+  captcha?: string
   agreeToTerms?: string
 }>({})
 
-const validateField = (field: 'email' | 'password' | 'agreeToTerms') => {
+const validateField = (field: 'email' | 'password' | 'confirmPassword' | 'captcha' | 'agreeToTerms') => {
   switch (field) {
     case 'email':
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -269,6 +365,30 @@ const validateField = (field: 'email' | 'password' | 'agreeToTerms') => {
       delete errors.value.password
       return true
 
+    case 'confirmPassword':
+      if (!form.value.confirmPassword) {
+        errors.value.confirmPassword = '请再次输入密码'
+        return false
+      }
+      if (form.value.confirmPassword !== form.value.password) {
+        errors.value.confirmPassword = '两次输入的密码不一致'
+        return false
+      }
+      delete errors.value.confirmPassword
+      return true
+
+    case 'captcha':
+      if (!form.value.captcha.trim()) {
+        errors.value.captcha = '请输入验证码'
+        return false
+      }
+      if (form.value.captcha.length !== 4) {
+        errors.value.captcha = '请输入4位验证码'
+        return false
+      }
+      delete errors.value.captcha
+      return true
+
     case 'agreeToTerms':
       if (mode.value === 'signup' && !form.value.agreeToTerms) {
         errors.value.agreeToTerms = '请阅读并同意服务条款和隐私政策'
@@ -281,8 +401,10 @@ const validateField = (field: 'email' | 'password' | 'agreeToTerms') => {
 
 const handleSubmit = async () => {
   // Validate all fields
+  validateField('captcha')  // Always validate captcha for both login and signup
   if (mode.value === 'signup') {
     validateField('agreeToTerms')
+    validateField('confirmPassword')
   }
   validateField('email')
   validateField('password')
@@ -299,30 +421,81 @@ const handleSubmit = async () => {
       const registerData: RegisterRequest = {
         email: form.value.email,
         password: form.value.password,
+        captchaCode: form.value.captcha,
+        captchaId: captchaId.value,
         agreeToTerms: form.value.agreeToTerms
       }
       const result = await auth.register(registerData)
 
       if (!result.success) {
-        errors.value.email = result.message || '注册失败'
+        // 根据错误码显示不同的错误信息
+        const errorCode = result.error?.code
+        if (errorCode === 'INVALID_CAPTCHA') {
+          errors.value.captcha = result.message || '验证码错误'
+          // 验证码错误后刷新
+          refreshCaptcha()
+        } else if (errorCode === 'EMAIL_EXISTS') {
+          errors.value.email = result.message || '该邮箱已被注册'
+          refreshCaptcha()  // 邮箱已存在也要刷新验证码
+        } else if (errorCode === 'TERMS_NOT_AGREED') {
+          errors.value.agreeToTerms = result.message || '必须同意服务条款'
+          // 条款未同意不需要刷新验证码
+        } else if (errorCode === 'VALIDATION_ERROR') {
+          // 验证错误，也要刷新验证码
+          toast.error(result.message || '请检查输入信息')
+          refreshCaptcha()
+          return
+        } else {
+          // 其他未知错误，也要刷新验证码
+          toast.error(result.message || '注册失败，请稍后重试')
+          refreshCaptcha()
+          return
+        }
+        toast.error(result.message || '注册失败，请检查输入信息')
         return
       }
     } else {
-      // 登录
+      // 登录 - 现在总是需要验证码
       const credentials: LoginRequest = {
         email: form.value.email,
         password: form.value.password,
+        captchaCode: form.value.captcha,
+        captchaId: captchaId.value,
         remember: form.value.remember
       }
       const result = await auth.login(credentials)
 
       if (!result.success) {
-        errors.value.password = result.message || '登录失败'
+        // 根据错误码显示不同的错误信息
+        const errorCode = result.error?.code
+        if (errorCode === 'INVALID_CAPTCHA') {
+          errors.value.captcha = result.message || '验证码错误'
+          refreshCaptcha()
+        } else if (errorCode === 'REQUIRE_CAPTCHA') {
+          errors.value.captcha = result.message || '请输入验证码'
+          // 刷新验证码让用户输入
+          refreshCaptcha()
+        } else if (errorCode === 'ACCOUNT_LOCKED') {
+          toast.error(result.message || '账户已临时锁定，请稍后再试')
+          refreshCaptcha()  // 账户锁定也要刷新验证码
+          return
+        } else if (errorCode === 'INVALID_CREDENTIALS') {
+          errors.value.password = result.message || '邮箱或密码错误'
+          refreshCaptcha()
+        } else {
+          // 网络错误、服务器错误等，也刷新验证码
+          toast.error(result.message || '登录失败，请稍后重试')
+          refreshCaptcha()
+          return
+        }
+        toast.error(result.message || '登录失败，请检查输入信息')
+        refreshCaptcha()  // 其他失败情况也刷新验证码
         return
       }
     }
 
     // 登录/注册成功，跳转到应用页面
+    toast.success(mode.value === 'signup' ? '注册成功！' : '登录成功！')
     router.push('/app')
   } finally {
     isLoading.value = false
@@ -345,6 +518,64 @@ const socialLogin = async (provider: 'wechat') => {
     console.error('WeChat login error:', error)
   }
 }
+
+const handleForgotPassword = () => {
+  // TODO: 实现忘记密码功能
+  // 可以：
+  // 1. 跳转到忘记密码页面 router.push('/forgot-password')
+  // 2. 或者打开一个模态框让用户输入邮箱
+  toast.info('忘记密码功能正在开发中，敬请期待')
+}
+
+// CAPTCHA - 使用后端API
+const refreshCaptcha = async () => {
+  try {
+    const response = await auth.getCaptcha()
+    if (response.success && response.data) {
+      captchaId.value = response.data.captchaId
+      captchaImage.value = response.data.image
+      // 清空用户输入的验证码
+      form.value.captcha = ''
+      delete errors.value.captcha
+    } else {
+      toast.error(response.message || '获取验证码失败')
+    }
+  } catch (error) {
+    console.error('Get captcha error:', error)
+    toast.error('获取验证码失败，请稍后重试')
+  }
+}
+
+// Initialize CAPTCHA on mount - for both login and signup
+onMounted(() => {
+  nextTick(() => {
+    refreshCaptcha()
+  })
+})
+
+// Watch for mode changes to refresh captcha
+watch(
+  mode,
+  () => {
+    // Always switch to email tab and refresh captcha when mode changes
+    loginMethod.value = 'email'
+    nextTick(() => {
+      refreshCaptcha()
+    })
+  }
+)
+
+// Watch for loginMethod changes to refresh captcha when switching to email tab
+watch(
+  loginMethod,
+  (newMethod) => {
+    if (newMethod === 'email') {
+      nextTick(() => {
+        refreshCaptcha()
+      })
+    }
+  }
+)
 </script>
 
 <style scoped>
@@ -382,17 +613,6 @@ const socialLogin = async (provider: 'wechat') => {
 
 .navbar :deep(.navbar-logo) svg {
   color: var(--primary);
-}
-
-.navbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.nav-text {
-  font-size: 14px;
-  color: var(--text-muted);
 }
 
 /* Main Content */
@@ -732,6 +952,76 @@ const socialLogin = async (provider: 'wechat') => {
   color: var(--text);
 }
 
+/* CAPTCHA Input */
+.captcha-input {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.captcha-field {
+  flex: 1;
+}
+
+.captcha-image-wrapper {
+  width: 120px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid var(--slate-200);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.captcha-image-wrapper:hover {
+  border-color: var(--primary);
+}
+
+.captcha-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.captcha-loading {
+  width: 120px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--slate-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.captcha-refresh-btn {
+  width: 36px;
+  height: 44px;
+  border: 2px solid var(--slate-200);
+  background: white;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.captcha-refresh-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--slate-50);
+}
+
+.captcha-refresh-btn:active {
+  transform: scale(0.95);
+}
+
 .form-options {
   display: flex;
   justify-content: space-between;
@@ -762,6 +1052,32 @@ const socialLogin = async (provider: 'wechat') => {
 
 .forgot-link:hover {
   color: var(--primary-700);
+}
+
+.mode-toggle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.mode-text {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.mode-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.mode-link:hover {
+  color: var(--primary-700);
+  text-decoration: underline;
 }
 
 .submit-btn {
