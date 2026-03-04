@@ -73,16 +73,16 @@
                 >
               </div>
 
-              <!-- Email (Read-only) -->
+              <!-- Phone (Read-only) -->
               <div class="setting-section">
-                <label class="setting-label">邮箱</label>
+                <label class="setting-label">手机号</label>
                 <input
-                  :value="user?.email"
-                  type="email"
+                  :value="user?.phone"
+                  type="tel"
                   class="setting-input"
                   disabled
                 >
-                <p class="setting-hint">邮箱地址不可修改</p>
+                <p class="setting-hint">手机号不可修改</p>
               </div>
             </div>
 

@@ -25,7 +25,7 @@
         <div class="dropdown-header">
           <div class="user-info">
             <div class="user-info-name">{{ displayName }}</div>
-            <div class="user-info-email">{{ user.email }}</div>
+            <div class="user-info-phone">{{ user.phone }}</div>
           </div>
         </div>
 
@@ -99,10 +99,10 @@ const isOpen = ref(false)
 const isSettingsOpen = ref(false)
 const user = ref<UserInfo | null>(null)
 
-// Display name: use name if available, otherwise use email
+// Display name: use name if available, otherwise use phone
 const displayName = computed(() => {
   if (!user.value) return ''
-  return user.value.name || user.value.email
+  return user.value.name || user.value.phone
 })
 
 // Get avatar icon component by name
@@ -136,6 +136,7 @@ const handleUserUpdated = (updatedUser: UserInfo) => {
 const handleLogout = async () => {
   await auth.logout()
   isOpen.value = false
+  updateUserState() // 立即更新用户状态
   router.push('/')
 }
 </script>
@@ -245,7 +246,7 @@ const handleLogout = async () => {
   margin-bottom: 4px;
 }
 
-.user-info-email {
+.user-info-phone {
   font-size: 13px;
   color: var(--text-muted);
 }

@@ -80,14 +80,15 @@
             <!-- Login Method Tabs -->
             <div class="login-tabs">
               <button
-                class="login-tab"
+                class="login-tab wechat-tab"
                 :class="{ active: loginMethod === 'wechat' }"
-                @click="loginMethod = 'wechat'"
+                @click="handleWechatClick"
               >
                 <svg class="tab-icon" viewBox="0 0 24 24" fill="#07C160">
                   <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/>
                 </svg>
                 <span>微信登录</span>
+                <span class="coming-soon-badge">暂不支持</span>
               </button>
               <button
                 class="login-tab"
@@ -95,7 +96,7 @@
                 @click="loginMethod = 'email'"
               >
                 <Mail :size="18" />
-                <span>邮箱登录</span>
+                <span>手机号登录</span>
               </button>
             </div>
 
@@ -103,33 +104,34 @@
             <div v-if="loginMethod === 'wechat'" class="login-content">
               <div class="wechat-qr-container">
                 <div class="wechat-qr-code">
-                  <div class="qr-placeholder">
-                    <QrCode :size="160" />
+                  <div class="qr-placeholder coming-soon">
+                    <Lock :size="48" />
                   </div>
-                  <div class="qr-status">扫码{{ mode === 'signup' ? '注册' : '登录' }}</div>
+                  <div class="qr-status">微信登录功能开发中</div>
                 </div>
-                <p class="wechat-tip">打开微信扫一扫，快速{{ mode === 'signup' ? '注册' : '登录' }}</p>
+                <p class="wechat-tip">敬请期待，请使用手机号登录</p>
               </div>
             </div>
 
-            <!-- Email Login Content -->
-            <div v-else class="login-content email-login-form">
+            <!-- Phone Login Content -->
+            <div v-else class="login-content phone-login-form">
 
             <!-- Login Form -->
             <form @submit.prevent="handleSubmit" class="login-form">
               <div class="form-group">
-                <label for="email">邮箱地址</label>
+                <label for="phone">手机号</label>
                 <input
-                  id="email"
-                  v-model="form.email"
-                  type="email"
+                  id="phone"
+                  v-model="form.phone"
+                  type="tel"
                   class="form-input"
-                  placeholder="your@email.com"
+                  placeholder="请输入11位手机号"
                   required
-                  :class="{ 'has-error': errors.email }"
-                  @blur="validateField('email')"
+                  maxlength="11"
+                  :class="{ 'has-error': errors.phone }"
+                  @blur="validateField('phone')"
                 >
-                <span v-if="errors.email" class="error-text">{{ errors.email }}</span>
+                <span v-if="errors.phone" class="error-text">{{ errors.phone }}</span>
               </div>
 
               <div class="form-group">
@@ -185,6 +187,33 @@
                 <span v-if="errors.confirmPassword" class="error-text">{{ errors.confirmPassword }}</span>
               </div>
 
+              <!-- SMS Code (only for signup) -->
+              <div v-show="mode === 'signup'" class="form-group">
+                <label for="smsCode">短信验证码</label>
+                <div class="sms-input">
+                  <input
+                    id="smsCode"
+                    v-model="form.smsCode"
+                    type="text"
+                    class="form-input sms-field"
+                    placeholder="6位验证码"
+                    :required="mode === 'signup'"
+                    :class="{ 'has-error': errors.smsCode }"
+                    @blur="validateField('smsCode')"
+                    maxlength="6"
+                  >
+                  <button
+                    type="button"
+                    class="sms-send-btn"
+                    @click="handleSendSms"
+                    :disabled="smsCountdown > 0"
+                  >
+                    {{ smsCountdown > 0 ? `${smsCountdown}秒后重发` : '发送验证码' }}
+                  </button>
+                </div>
+                <span v-if="errors.smsCode" class="error-text">{{ errors.smsCode }}</span>
+              </div>
+
               <!-- CAPTCHA (for both login and signup) -->
               <div class="form-group">
                 <label for="captcha">验证码</label>
@@ -237,7 +266,7 @@
                   <input type="checkbox" v-model="form.remember" checked>
                   <span>记住我</span>
                 </label>
-                <a href="#" class="forgot-link" @click.prevent="handleForgotPassword">忘记密码？</a>
+                <a href="#" class="forgot-link" @click.prevent="isForgotPasswordOpen = true">忘记密码？</a>
               </div>
 
               <!-- Mode Toggle Link (above submit button) -->
@@ -289,16 +318,23 @@
     <footer class="footer">
       <p>© 2024 Graftra. All rights reserved.</p>
     </footer>
+
+    <!-- Forgot Password Modal -->
+    <ForgotPasswordModal
+      :is-open="isForgotPasswordOpen"
+      @close="isForgotPasswordOpen = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import {
-  Hexagon, Sparkles, Zap, Palette, Download, Shield, Eye, EyeOff, Loader2, Mail, QrCode, RefreshCw
+  Hexagon, Sparkles, Zap, Palette, Download, Shield, Eye, EyeOff, Loader2, Mail, QrCode, RefreshCw, Lock
 } from 'lucide-vue-next'
 import { auth } from '@/utils/auth'
+import ForgotPasswordModal from '@/components/ForgotPasswordModal.vue'
 import type { LoginRequest, RegisterRequest } from '@/types/auth'
 import { useToast } from '@/composables/useToast'
 
@@ -306,51 +342,61 @@ const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 
+// Forgot password modal state
+const isForgotPasswordOpen = ref(false)
+
 const mode = computed<'login' | 'signup'>(() => {
   const modeParam = route.query.mode as 'login' | 'signup' | undefined
   return modeParam === 'signup' ? 'signup' : 'login'
 })
 
-// 登录模式默认邮箱登录，注册模式也默认邮箱登录
+// 登录模式默认手机号登录，注册模式也默认手机号登录
 const loginMethod = ref<'wechat' | 'email'>('email')
 const isLoading = ref(false)
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
 // CAPTCHA - 使用后端API
+// 登录和注册都需要验证码
 const captchaId = ref('')              // 后端返回的验证码ID
 const captchaImage = ref('')           // 后端返回的Base64图片
 
 const form = ref({
-  email: '',
+  phone: '',
   password: '',
   confirmPassword: '',
   remember: true,
   agreeToTerms: false,
   captcha: '',                         // 用户输入的验证码
+  smsCode: '',                         // 短信验证码
 })
 
 const errors = ref<{
-  email?: string
+  phone?: string
   password?: string
   confirmPassword?: string
   captcha?: string
+  smsCode?: string
   agreeToTerms?: string
 }>({})
 
-const validateField = (field: 'email' | 'password' | 'confirmPassword' | 'captcha' | 'agreeToTerms') => {
+// SMS countdown state
+const smsCountdown = ref(0)
+let smsTimer: ReturnType<typeof setInterval> | null = null
+
+const validateField = (field: 'phone' | 'password' | 'confirmPassword' | 'captcha' | 'smsCode' | 'agreeToTerms') => {
   switch (field) {
-    case 'email':
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!form.value.email.trim()) {
-        errors.value.email = '请输入邮箱地址'
+    case 'phone':
+      const phoneRegex = /^1[3-9]\d{9}$/
+      if (!form.value.phone.trim()) {
+        errors.value.phone = '请输入手机号'
         return false
       }
-      if (!emailRegex.test(form.value.email)) {
-        errors.value.email = '请输入有效的邮箱地址'
+      if (!phoneRegex.test(form.value.phone)) {
+        errors.value.phone = '请输入有效的手机号'
         return false
       }
-      delete errors.value.email
+      delete errors.value.phone
       return true
 
     case 'password':
@@ -389,6 +435,18 @@ const validateField = (field: 'email' | 'password' | 'confirmPassword' | 'captch
       delete errors.value.captcha
       return true
 
+    case 'smsCode':
+      if (!form.value.smsCode.trim()) {
+        errors.value.smsCode = '请输入短信验证码'
+        return false
+      }
+      if (form.value.smsCode.length !== 6) {
+        errors.value.smsCode = '请输入6位验证码'
+        return false
+      }
+      delete errors.value.smsCode
+      return true
+
     case 'agreeToTerms':
       if (mode.value === 'signup' && !form.value.agreeToTerms) {
         errors.value.agreeToTerms = '请阅读并同意服务条款和隐私政策'
@@ -401,13 +459,28 @@ const validateField = (field: 'email' | 'password' | 'confirmPassword' | 'captch
 
 const handleSubmit = async () => {
   // Validate all fields
-  validateField('captcha')  // Always validate captcha for both login and signup
-  if (mode.value === 'signup') {
-    validateField('agreeToTerms')
-    validateField('confirmPassword')
+  if (!validateField('captcha')) {
+    return
   }
-  validateField('email')
-  validateField('password')
+  if (!validateField('phone')) {
+    return
+  }
+  if (!validateField('password')) {
+    return
+  }
+
+  // For signup, validate additional fields
+  if (mode.value === 'signup') {
+    if (!validateField('confirmPassword')) {
+      return
+    }
+    if (!validateField('smsCode')) {
+      return
+    }
+    if (!validateField('agreeToTerms')) {
+      return
+    }
+  }
 
   if (Object.keys(errors.value).length > 0) {
     return
@@ -419,8 +492,9 @@ const handleSubmit = async () => {
     if (mode.value === 'signup') {
       // 注册
       const registerData: RegisterRequest = {
-        email: form.value.email,
+        phone: form.value.phone,
         password: form.value.password,
+        smsCode: form.value.smsCode,
         captchaCode: form.value.captcha,
         captchaId: captchaId.value,
         agreeToTerms: form.value.agreeToTerms
@@ -428,36 +502,26 @@ const handleSubmit = async () => {
       const result = await auth.register(registerData)
 
       if (!result.success) {
-        // 根据错误码显示不同的错误信息
         const errorCode = result.error?.code
         if (errorCode === 'INVALID_CAPTCHA') {
-          errors.value.captcha = result.message || '验证码错误'
-          // 验证码错误后刷新
-          refreshCaptcha()
-        } else if (errorCode === 'EMAIL_EXISTS') {
-          errors.value.email = result.message || '该邮箱已被注册'
-          refreshCaptcha()  // 邮箱已存在也要刷新验证码
+          errors.value.captcha = result.message || '验证码错误或已过期'
+        } else if (errorCode === 'INVALID_SMS_CODE') {
+          errors.value.smsCode = result.message || '短信验证码错误或已过期'
+        } else if (errorCode === 'PHONE_EXISTS') {
+          errors.value.phone = result.message || '该手机号已被注册'
         } else if (errorCode === 'TERMS_NOT_AGREED') {
           errors.value.agreeToTerms = result.message || '必须同意服务条款'
-          // 条款未同意不需要刷新验证码
-        } else if (errorCode === 'VALIDATION_ERROR') {
-          // 验证错误，也要刷新验证码
-          toast.error(result.message || '请检查输入信息')
-          refreshCaptcha()
-          return
         } else {
-          // 其他未知错误，也要刷新验证码
           toast.error(result.message || '注册失败，请稍后重试')
-          refreshCaptcha()
-          return
         }
-        toast.error(result.message || '注册失败，请检查输入信息')
+        // 任何错误都刷新验证码
+        refreshCaptcha()
         return
       }
     } else {
-      // 登录 - 现在总是需要验证码
+      // 登录 - 验证码通过登录接口传给后端校验
       const credentials: LoginRequest = {
-        email: form.value.email,
+        phone: form.value.phone,
         password: form.value.password,
         captchaCode: form.value.captcha,
         captchaId: captchaId.value,
@@ -466,30 +530,18 @@ const handleSubmit = async () => {
       const result = await auth.login(credentials)
 
       if (!result.success) {
-        // 根据错误码显示不同的错误信息
         const errorCode = result.error?.code
         if (errorCode === 'INVALID_CAPTCHA') {
-          errors.value.captcha = result.message || '验证码错误'
-          refreshCaptcha()
-        } else if (errorCode === 'REQUIRE_CAPTCHA') {
-          errors.value.captcha = result.message || '请输入验证码'
-          // 刷新验证码让用户输入
-          refreshCaptcha()
+          errors.value.captcha = result.message || '验证码错误或已过期'
+        } else if (errorCode === 'INVALID_CREDENTIALS') {
+          errors.value.password = result.message || '手机号或密码错误'
         } else if (errorCode === 'ACCOUNT_LOCKED') {
           toast.error(result.message || '账户已临时锁定，请稍后再试')
-          refreshCaptcha()  // 账户锁定也要刷新验证码
-          return
-        } else if (errorCode === 'INVALID_CREDENTIALS') {
-          errors.value.password = result.message || '邮箱或密码错误'
-          refreshCaptcha()
         } else {
-          // 网络错误、服务器错误等，也刷新验证码
           toast.error(result.message || '登录失败，请稍后重试')
-          refreshCaptcha()
-          return
         }
-        toast.error(result.message || '登录失败，请检查输入信息')
-        refreshCaptcha()  // 其他失败情况也刷新验证码
+        // 任何错误都刷新验证码
+        refreshCaptcha()
         return
       }
     }
@@ -519,12 +571,49 @@ const socialLogin = async (provider: 'wechat') => {
   }
 }
 
-const handleForgotPassword = () => {
-  // TODO: 实现忘记密码功能
-  // 可以：
-  // 1. 跳转到忘记密码页面 router.push('/forgot-password')
-  // 2. 或者打开一个模态框让用户输入邮箱
-  toast.info('忘记密码功能正在开发中，敬请期待')
+const handleWechatClick = () => {
+  // 微信登录暂不支持
+  toast.info('微信登录功能正在开发中，敬请期待')
+}
+
+// Send SMS verification code
+const handleSendSms = async () => {
+  // Validate phone first
+  if (!validateField('phone')) {
+    return
+  }
+
+  try {
+    const result = await auth.sendSms(form.value.phone)
+
+    if (result.success) {
+      toast.success('验证码已发送到您的手机，请查收')
+
+      // Start countdown
+      smsCountdown.value = 60
+      smsTimer = setInterval(() => {
+        smsCountdown.value--
+        if (smsCountdown.value <= 0) {
+          if (smsTimer) {
+            clearInterval(smsTimer)
+            smsTimer = null
+          }
+        }
+      }, 1000)
+    } else {
+      const errorCode = result.error?.code
+      if (errorCode === 'SMS_CODE_RECENTLY_SENT') {
+        toast.error(result.message || '验证码已发送，请稍后再试')
+      } else if (errorCode === 'INVALID_PHONE_FORMAT') {
+        errors.value.phone = result.message || '手机号格式不正确'
+      } else {
+        toast.error(result.message || '发送验证码失败，请稍后重试')
+      }
+    }
+  } catch (error) {
+    console.error('Send SMS error:', error)
+    toast.error('发送验证码失败，请稍后重试')
+  }
 }
 
 // CAPTCHA - 使用后端API
@@ -546,18 +635,26 @@ const refreshCaptcha = async () => {
   }
 }
 
-// Initialize CAPTCHA on mount - for both login and signup
+// Initialize CAPTCHA on mount - always load captcha
 onMounted(() => {
   nextTick(() => {
     refreshCaptcha()
   })
 })
 
+// Cleanup SMS timer on unmount
+onUnmounted(() => {
+  if (smsTimer) {
+    clearInterval(smsTimer)
+    smsTimer = null
+  }
+})
+
 // Watch for mode changes to refresh captcha
 watch(
   mode,
   () => {
-    // Always switch to email tab and refresh captcha when mode changes
+    // Always switch to phone tab and refresh captcha when mode changes
     loginMethod.value = 'email'
     nextTick(() => {
       refreshCaptcha()
@@ -565,7 +662,7 @@ watch(
   }
 )
 
-// Watch for loginMethod changes to refresh captcha when switching to email tab
+// Watch for loginMethod changes to refresh captcha when switching to phone tab
 watch(
   loginMethod,
   (newMethod) => {
@@ -802,6 +899,42 @@ watch(
   height: 18px;
 }
 
+/* WeChat Tab - Disabled State */
+.login-tab.wechat-tab {
+  opacity: 0.6;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.login-tab.wechat-tab:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.coming-soon-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #f59e0b;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.qr-placeholder.coming-soon {
+  background: var(--slate-100);
+  border-color: var(--slate-300);
+}
+
+.qr-placeholder.coming-soon :deep(svg) {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
 /* Login Content */
 .login-content {
   animation: fadeIn 0.3s ease;
@@ -871,8 +1004,8 @@ watch(
   margin: 0;
 }
 
-/* Email Login Form */
-.email-login-form {
+/* Phone Login Form */
+.phone-login-form {
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -961,6 +1094,44 @@ watch(
 
 .captcha-field {
   flex: 1;
+}
+
+/* SMS Input */
+.sms-input {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.sms-field {
+  flex: 1;
+}
+
+.sms-send-btn {
+  padding: 0 20px;
+  height: 48px;
+  border: 2px solid var(--primary);
+  background: white;
+  color: var(--primary);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sms-send-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: white;
+}
+
+.sms-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--slate-300);
+  color: var(--text-muted);
 }
 
 .captcha-image-wrapper {

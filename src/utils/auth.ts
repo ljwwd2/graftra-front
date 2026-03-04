@@ -15,7 +15,9 @@ import type {
   ChangePasswordRequest,
   UpdateUserRequest,
   UploadResponse,
-  ApiResponse
+  ApiResponse,
+  SendSmsRequest,
+  ResetPasswordRequest
 } from '@/types/auth'
 
 const STORAGE_KEY = 'graftra_user_session'
@@ -42,7 +44,7 @@ export class AuthManager {
   }
 
   /**
-   * 邮箱密码登录
+   * 手机号密码登录
    *
    * API 端点: POST /api/auth/login
    */
@@ -57,7 +59,7 @@ export class AuthManager {
           token: response.data.token,
           refreshToken: response.data.refreshToken,
           expiresAt: Date.now() + response.data.expiresIn * 1000,
-          loginMethod: 'email'
+          loginMethod: 'PHONE'
         }
         this.saveSession(session)
       }
@@ -67,6 +69,57 @@ export class AuthManager {
       return {
         success: false,
         message: error.message || '登录失败，请稍后重试'
+      }
+    }
+  }
+
+  /**
+   * 发送短信验证码（注册）
+   *
+   * API 端点: POST /api/auth/send-sms?phone={phone}
+   */
+  static async sendSms(phone: string): Promise<ApiResponse> {
+    try {
+      const response = await http.post<ApiResponse>(`/api/auth/send-sms?phone=${phone}`, {})
+      return response
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '发送验证码失败，请稍后重试'
+      }
+    }
+  }
+
+  /**
+   * 发送重置密码短信验证码
+   *
+   * API 端点: POST /api/auth/send-reset-sms?phone={phone}
+   */
+  static async sendResetSms(phone: string): Promise<ApiResponse> {
+    try {
+      const response = await http.post<ApiResponse>(`/api/auth/send-reset-sms?phone=${phone}`, {})
+      return response
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '发送验证码失败，请稍后重试'
+      }
+    }
+  }
+
+  /**
+   * 重置密码
+   *
+   * API 端点: POST /api/auth/reset-password
+   */
+  static async resetPassword(data: ResetPasswordRequest): Promise<ApiResponse> {
+    try {
+      const response = await http.post<ApiResponse>('/api/auth/reset-password', data)
+      return response
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || '重置密码失败，请稍后重试'
       }
     }
   }
@@ -87,7 +140,7 @@ export class AuthManager {
           token: response.data.token,
           refreshToken: response.data.refreshToken,
           expiresAt: Date.now() + response.data.expiresIn * 1000,
-          loginMethod: 'email'
+          loginMethod: 'PHONE'
         }
         this.saveSession(session)
       }
@@ -117,7 +170,7 @@ export class AuthManager {
           token: response.data.token,
           refreshToken: response.data.refreshToken,
           expiresAt: Date.now() + response.data.expiresIn * 1000,
-          loginMethod: 'wechat'
+          loginMethod: 'WECHAT'
         }
         this.saveSession(session)
       }
@@ -336,6 +389,9 @@ export class AuthManager {
 // 导出便捷函数
 export const auth = {
   getCaptcha: () => AuthManager.getCaptcha(),
+  sendSms: (phone: string) => AuthManager.sendSms(phone),
+  sendResetSms: (phone: string) => AuthManager.sendResetSms(phone),
+  resetPassword: (data: ResetPasswordRequest) => AuthManager.resetPassword(data),
   login: (credentials: LoginRequest) => AuthManager.login(credentials),
   register: (data: RegisterRequest) => AuthManager.register(data),
   wechatLogin: (params: WeChatLoginRequest) => AuthManager.wechatLogin(params),

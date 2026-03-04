@@ -20,7 +20,7 @@ export interface ApiResponse<T = any> {
 
 /** 登录请求参数 */
 export interface LoginRequest {
-  email: string
+  phone: string
   password: string
   captchaCode: string
   captchaId: string
@@ -33,19 +33,32 @@ export interface WeChatLoginRequest {
   state?: string    // 状态参数
 }
 
+/** 发送短信验证码请求参数 */
+export interface SendSmsRequest {
+  phone: string
+}
+
 /** 注册请求参数 */
 export interface RegisterRequest {
-  email: string
+  phone: string
   password: string
-  name?: string
+  smsCode: string        // 短信验证码（6位数字）
   captchaCode: string
   captchaId: string
   agreeToTerms: boolean
+  name?: string
 }
 
 /** 修改密码请求参数 */
 export interface ChangePasswordRequest {
   oldPassword: string
+  newPassword: string
+}
+
+/** 重置密码请求参数 */
+export interface ResetPasswordRequest {
+  phone: string
+  smsCode: string
   newPassword: string
 }
 
@@ -83,8 +96,9 @@ export interface RefreshTokenRequest {
 export interface UserInfo {
   id: string
   name: string
-  email: string
+  phone: string
   avatar?: string | null
+  loginMethod: 'PHONE' | 'WECHAT'
   createdAt: string
 }
 
@@ -120,7 +134,7 @@ export interface UserSession {
   token: string
   refreshToken?: string
   expiresAt: number
-  loginMethod: 'email' | 'wechat'
+  loginMethod: 'PHONE' | 'WECHAT'
 }
 
 // ==================== API 端点配置 ====================
@@ -129,12 +143,18 @@ export interface UserSession {
 export const AUTH_ENDPOINTS = {
   // 生成验证码
   CAPTCHA: '/api/auth/captcha',
-  // 邮箱登录
+  // 发送短信验证码
+  SEND_SMS: '/api/auth/send-sms',
+  // 发送重置密码短信验证码
+  SEND_RESET_SMS: '/api/auth/send-reset-sms',
+  // 手机号登录
   LOGIN: '/api/auth/login',
-  // 邮箱注册
+  // 手机号注册
   REGISTER: '/api/auth/register',
   // 微信登录
   WECHAT_LOGIN: '/api/auth/wechat',
+  // 重置密码
+  RESET_PASSWORD: '/api/auth/reset-password',
   // 退出登录
   LOGOUT: '/api/auth/logout',
   // 刷新令牌
@@ -161,10 +181,11 @@ export interface ApiError {
 
 /** 常见错误码 */
 export const ERROR_CODES = {
-  EMAIL_EXISTS: 'EMAIL_EXISTS',                      // 邮箱已被注册
-  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',        // 邮箱或密码错误
+  PHONE_EXISTS: 'PHONE_EXISTS',                      // 手机号已被注册
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',        // 手机号或密码错误
   INVALID_CAPTCHA: 'INVALID_CAPTCHA',                // 验证码错误或已过期
-  REQUIRE_CAPTCHA: 'REQUIRE_CAPTCHA',                // 需要输入验证码（失败3次后）
+  INVALID_SMS_CODE: 'INVALID_SMS_CODE',              // 短信验证码错误或已过期
+  REQUIRE_CAPTCHA: 'REQUIRE_CAPTCHA',                // 需要输入验证码（失败6次后）
   ACCOUNT_LOCKED: 'ACCOUNT_LOCKED',                  // 登录失败次数过多，账户已临时锁定
   TERMS_NOT_AGREED: 'TERMS_NOT_AGREED',              // 必须同意服务条款
   UNAUTHORIZED: 'UNAUTHORIZED',                      // 令牌无效或过期
@@ -176,6 +197,8 @@ export const ERROR_CODES = {
   REFRESH_TOKEN_EXPIRED: 'REFRESH_TOKEN_EXPIRED',    // 刷新令牌已失效
   INVALID_OLD_PASSWORD: 'INVALID_OLD_PASSWORD',      // 旧密码错误
   SAME_PASSWORD: 'SAME_PASSWORD',                    // 新密码不能与旧密码相同
+  INVALID_PHONE_FORMAT: 'INVALID_PHONE_FORMAT',      // 手机号格式不正确
+  SMS_CODE_RECENTLY_SENT: 'SMS_CODE_RECENTLY_SENT',  // 验证码已发送，请稍后再试
 } as const
 
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]
