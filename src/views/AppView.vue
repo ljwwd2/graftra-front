@@ -793,6 +793,13 @@ const SEARCH_API_ENDPOINT = 'http://localhost:8080/api/v1/chart-generation/searc
 const GENERATION_API_ENDPOINT = 'http://localhost:8080/api/v1/chart-generation/create'
 const NO_REFERENCE_API_ENDPOINT = 'http://localhost:8080/api/v1/chart-generation/create-no-reference'
 
+// Helper function to get auth headers for fetch requests
+const getAuthHeaders = (): Record<string, string> => {
+  const session = localStorage.getItem('graftra_user_session')
+  const token = session ? JSON.parse(session)?.token : null
+  return token ? { 'Authorization': `Bearer ${token}` } : {}
+}
+
 // Types
 interface ChartData {
   chart_id: string
@@ -1507,6 +1514,7 @@ const generateSingleChart = async (chart: ChartData): Promise<ChartGenerationRes
 
       response = await fetch(GENERATION_API_ENDPOINT, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData
       })
     } else {
@@ -1519,6 +1527,7 @@ const generateSingleChart = async (chart: ChartData): Promise<ChartGenerationRes
 
       response = await fetch(NO_REFERENCE_API_ENDPOINT, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData
       })
     }
@@ -1969,8 +1978,18 @@ const analyzeDocument = async (): Promise<boolean> => {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000) // 5分钟超时
 
+    // Get token from localStorage for authentication
+    const session = localStorage.getItem('graftra_user_session')
+    const token = session ? JSON.parse(session)?.token : null
+
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
+      headers,
       body: formData,
       signal: controller.signal
     })
@@ -2252,7 +2271,8 @@ const searchReferenceImages = async (): Promise<boolean> => {
     const response = await fetch(SEARCH_API_ENDPOINT, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
       },
       body: JSON.stringify(requestBody)
     })
